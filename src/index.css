@@ -1,0 +1,37 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --chart-background: #ffffff;
+  --chart-foreground: #1e293b;
+  --chart-foreground-muted: #64748b;
+  --chart-label: #64748b;
+  --chart-muted: #f1f5f9;
+  --chart-line-primary: #0a3fa8;
+  --chart-line-secondary: #e11d2a;
+  --chart-crosshair: #0a3fa8;
+  --chart-grid: #e2e8f0;
+  --chart-tooltip-background: rgba(15, 23, 42, 0.92);
+  --chart-tooltip-foreground: #ffffff;
+  --chart-tooltip-muted: #cbd5e1;
+}
+
+body {
+  @apply bg-slate-100 text-slate-800;
+}
+
+@layer components {
+  .input {
+    @apply w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/30;
+  }
+  .btn-primary {
+    @apply rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark transition disabled:opacity-50;
+  }
+  .btn-ghost {
+    @apply rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 transition;
+  }
+  .link {
+    @apply text-sm font-medium text-brand-dark hover:underline;
+  }
+}
