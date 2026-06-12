@@ -1,48 +1,81 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase.js'
 import { money, todayISO } from '../lib/format.js'
+import PasseioSelect from '../components/PasseioSelect.jsx'
 
+const PAGE_SIZE = 10
 const emptyForm = { passeio_id: '', data: todayISO(), quantidade: '' }
 
 export default function Lancamentos() {
   const [passeios, setPasseios] = useState([])
   const [lancamentos, setLancamentos] = useState([])
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(0)
+  const [searchDate, setSearchDate] = useState('')
+  const [tick, setTick] = useState(0) // força recarregar a lista após salvar/excluir
+
   const [form, setForm] = useState(emptyForm)
   const [editId, setEditId] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(true) // passeios (formulário)
+  const [listLoading, setListLoading] = useState(true) // tabela
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
   const [error, setError] = useState('')
 
-  async function load() {
+  // Passeios do seletor — carrega uma vez.
+  useEffect(() => {
     if (!supabase) return setLoading(false)
-    setLoading(true)
-    const [pRes, lRes] = await Promise.all([
-      supabase.from('passeios').select('id, nome, custo_pax, preco_venda_pax').eq('ativo', true).order('nome'),
-      supabase
+    ;(async () => {
+      const { data, error } = await supabase
+        .from('passeios')
+        .select('id, nome, custo_pax, preco_venda_pax')
+        .eq('ativo', true)
+        .order('nome')
+      if (error) setError(error.message)
+      else setPasseios(data)
+      setLoading(false)
+    })()
+  }, [])
+
+  // Lançamentos — 10 por página, filtráveis por data (busca qualquer dia, não só os recentes).
+  useEffect(() => {
+    if (!supabase) return setListLoading(false)
+    let cancelled = false
+    ;(async () => {
+      setListLoading(true)
+      let q = supabase
         .from('lancamentos')
-        .select('id, data, quantidade, passeio_id, passeios(nome, custo_pax, preco_venda_pax)')
+        .select('id, data, quantidade, passeio_id, passeios(nome, custo_pax, preco_venda_pax)', {
+          count: 'exact',
+        })
         .order('data', { ascending: false })
         .order('created_at', { ascending: false })
-        .limit(100),
-    ])
-    if (pRes.error || lRes.error) {
-      setError((pRes.error || lRes.error).message)
-      setLoading(false)
-      return
+      if (searchDate) q = q.eq('data', searchDate)
+      q = q.range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1)
+      const { data, error, count } = await q
+      if (cancelled) return
+      if (error) {
+        setError(error.message)
+        setListLoading(false)
+        return
+      }
+      // Se a página ficou vazia depois de excluir o último item, volta uma.
+      if (data.length === 0 && page > 0) return setPage((p) => p - 1)
+      setLancamentos(data)
+      setTotal(count ?? 0)
+      setListLoading(false)
+    })()
+    return () => {
+      cancelled = true
     }
-    setPasseios(pRes.data)
-    setLancamentos(lRes.data)
-    setLoading(false)
-  }
+  }, [page, searchDate, tick])
 
-  useEffect(() => {
-    load()
-  }, [])
+  const refreshList = () => setTick((t) => t + 1)
 
   const passeioSel = passeios.find((p) => String(p.id) === String(form.passeio_id))
   const qtd = parseInt(form.quantidade, 10) || 0
   const previewFat = passeioSel ? qtd * Number(passeioSel.preco_venda_pax) : 0
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
   async function save(e) {
     e.preventDefault()
@@ -67,7 +100,10 @@ export default function Lancamentos() {
     setMsg(editId ? 'Lançamento atualizado!' : 'Lançamento salvo!')
     setEditId(null)
     setForm({ ...emptyForm, data: form.data }) // mantém a data, limpa o resto
-    load()
+    // Mostra o resultado no topo da lista.
+    setSearchDate('')
+    setPage(0)
+    refreshList()
   }
 
   function editRow(l) {
@@ -87,7 +123,7 @@ export default function Lancamentos() {
     if (!confirm('Excluir este lançamento?')) return
     const { error } = await supabase.from('lancamentos').delete().eq('id', id)
     if (error) return setError(error.message)
-    load()
+    refreshList()
   }
 
   const fmtData = (iso) => iso.split('-').reverse().join('/')
@@ -97,28 +133,27 @@ export default function Lancamentos() {
       <h1 className="text-2xl font-bold">Lançar</h1>
 
       <form onSubmit={save} className="bg-white rounded-xl border border-slate-200 p-4 grid gap-3 sm:grid-cols-4 items-end">
-        <Field label="Passeio" className="sm:col-span-2">
-          <select
-            className="input"
+        <div className="block sm:col-span-2">
+          <span className="block text-xs font-medium text-slate-500 mb-1">Passeio</span>
+          <PasseioSelect
+            passeios={passeios}
             value={form.passeio_id}
-            onChange={(e) => setForm({ ...form, passeio_id: e.target.value })}
-          >
-            <option value="">Selecione…</option>
-            {passeios.map((p) => (
-              <option key={p.id} value={p.id}>{p.nome}</option>
-            ))}
-          </select>
-        </Field>
+            onChange={(id) => setForm((f) => ({ ...f, passeio_id: id }))}
+          />
+        </div>
         <Field label="Data">
           <input
-            type="date" className="input"
+            type="date"
+            className="input"
             value={form.data}
             onChange={(e) => setForm({ ...form, data: e.target.value })}
           />
         </Field>
         <Field label="Pessoas">
           <input
-            type="number" min="0" className="input"
+            type="number"
+            min="0"
+            className="input"
             value={form.quantidade}
             onChange={(e) => setForm({ ...form, quantidade: e.target.value })}
             placeholder="0"
@@ -148,7 +183,36 @@ export default function Lancamentos() {
       {error && <p className="text-sm text-accent">{error}</p>}
 
       <div>
-        <h2 className="text-sm font-semibold text-slate-600 mb-2">Lançamentos recentes</h2>
+        <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
+          <h2 className="text-sm font-semibold text-slate-600">
+            {searchDate ? `Lançamentos de ${fmtData(searchDate)}` : 'Lançamentos recentes'}
+          </h2>
+          <div className="flex items-center gap-2">
+            <input
+              type="date"
+              className="input w-auto py-1.5"
+              value={searchDate}
+              onChange={(e) => {
+                setPage(0)
+                setSearchDate(e.target.value)
+              }}
+              aria-label="Buscar por data"
+            />
+            {searchDate && (
+              <button
+                type="button"
+                className="link"
+                onClick={() => {
+                  setPage(0)
+                  setSearchDate('')
+                }}
+              >
+                Limpar
+              </button>
+            )}
+          </div>
+        </div>
+
         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-slate-500 text-left">
@@ -161,28 +225,70 @@ export default function Lancamentos() {
               </tr>
             </thead>
             <tbody>
-              {loading && (
-                <tr><td colSpan={5} className="px-4 py-6 text-center text-slate-400">Carregando…</td></tr>
-              )}
-              {!loading && lancamentos.length === 0 && (
-                <tr><td colSpan={5} className="px-4 py-6 text-center text-slate-400">Nenhum lançamento ainda.</td></tr>
-              )}
-              {lancamentos.map((l) => (
-                <tr key={l.id} className="border-t border-slate-100">
-                  <td className="px-4 py-2 whitespace-nowrap">{fmtData(l.data)}</td>
-                  <td className="px-4 py-2 font-medium">{l.passeios?.nome || '—'}</td>
-                  <td className="px-4 py-2 text-right">{l.quantidade}</td>
-                  <td className="px-4 py-2 text-right">
-                    {money(l.quantidade * Number(l.passeios?.preco_venda_pax || 0))}
-                  </td>
-                  <td className="px-4 py-2 text-right whitespace-nowrap">
-                    <button className="link" onClick={() => editRow(l)}>Editar</button>
-                    <button className="link text-accent ml-3" onClick={() => remove(l.id)}>Excluir</button>
+              {listLoading && (
+                <tr>
+                  <td colSpan={5} className="px-4 py-6 text-center text-slate-400">
+                    Carregando…
                   </td>
                 </tr>
-              ))}
+              )}
+              {!listLoading && lancamentos.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-4 py-6 text-center text-slate-400">
+                    {searchDate ? 'Nenhum lançamento nesta data.' : 'Nenhum lançamento ainda.'}
+                  </td>
+                </tr>
+              )}
+              {!listLoading &&
+                lancamentos.map((l) => (
+                  <tr key={l.id} className="border-t border-slate-100">
+                    <td className="px-4 py-2 whitespace-nowrap">{fmtData(l.data)}</td>
+                    <td className="px-4 py-2 font-medium">{l.passeios?.nome || '—'}</td>
+                    <td className="px-4 py-2 text-right">{l.quantidade}</td>
+                    <td className="px-4 py-2 text-right">
+                      {money(l.quantidade * Number(l.passeios?.preco_venda_pax || 0))}
+                    </td>
+                    <td className="px-4 py-2 text-right whitespace-nowrap">
+                      <button className="link" onClick={() => editRow(l)}>
+                        Editar
+                      </button>
+                      <button className="link text-accent ml-3" onClick={() => remove(l.id)}>
+                        Excluir
+                      </button>
+                    </td>
+                  </tr>
+                ))}
             </tbody>
           </table>
+
+          {!listLoading && total > 0 && (
+            <div className="flex items-center justify-between gap-3 px-4 py-3 border-t border-slate-100 text-sm text-slate-500">
+              <span>
+                {total} lançamento{total === 1 ? '' : 's'}
+              </span>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  className="btn-ghost px-3 py-1 disabled:opacity-40"
+                  disabled={page === 0}
+                  onClick={() => setPage((p) => Math.max(0, p - 1))}
+                >
+                  Anterior
+                </button>
+                <span>
+                  Página {page + 1} de {totalPages}
+                </span>
+                <button
+                  type="button"
+                  className="btn-ghost px-3 py-1 disabled:opacity-40"
+                  disabled={page + 1 >= totalPages}
+                  onClick={() => setPage((p) => p + 1)}
+                >
+                  Próxima
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
