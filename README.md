@@ -2,9 +2,9 @@
 
 Sistema simples de gestão de passeios turísticos:
 
-- **Passeios** — cadastro dos passeios (custo /pax e preço de venda /pax)
+- **Passeios** — cadastro dos passeios (custo /pax)
 - **Lançar** — por dia, quantas pessoas em cada passeio
-- **Dashboard** — faturamento, gasto, lucro e nº de passeios do dia, + gráficos
+- **Dashboard** — custo de operação, custo médio por pessoa e nº de pessoas, + gráficos
 
 Stack: React + Vite + Tailwind, dados no **Supabase**, deploy via **Docker** (nginx).
 
@@ -70,6 +70,5 @@ docker run -d -p 8080:80 \
 
 ## Como o cálculo funciona
 
-- **Faturamento do dia** = Σ (pessoas × preço de venda /pax)
-- **Gasto do dia** = Σ (pessoas × custo /pax)
-- **Lucro do dia** = faturamento − gasto
+- **Custo do dia** = Σ (pessoas × custo /pax)
+- **Custo médio por pessoa** = custo total ÷ nº de pessoas

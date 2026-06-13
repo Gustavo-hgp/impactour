@@ -2,11 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase.js'
 import { money } from '../lib/format.js'
 import DateFilter from '../components/DateFilter.jsx'
-import {
-  BarChart, Bar, BarXAxis, Grid, ChartTooltip,
-  Legend, LegendItemComponent, LegendMarker, LegendLabel,
-} from '../components/ui/bar-chart.jsx'
-import { Bar as RBar, Line, ComposedChart, CartesianGrid, XAxis } from 'recharts'
+import { BarChart, Bar, BarYAxis, Grid, ChartTooltip } from '../components/ui/bar-chart.jsx'
+import { Bar as RBar, ComposedChart, CartesianGrid, XAxis } from 'recharts'
 import {
   ChartContainer,
   ChartTooltip as RChartTooltip,
@@ -14,11 +11,9 @@ import {
 } from '../components/ui/chart.jsx'
 
 const NAVY = '#0a3fa8'
-const RED = '#e11d2a'
 
 const chartConfig = {
-  faturamento: { label: 'Faturamento', color: NAVY },
-  gasto: { label: 'Custo', color: RED },
+  gasto: { label: 'Custo', color: NAVY },
 }
 
 const toISO = (d) => (d ? d.toLocaleDateString('en-CA') : null)
@@ -59,7 +54,7 @@ export default function Dashboard() {
   const fetchLo = fetchDates[0]
   const fetchHi = fetchDates[fetchDates.length - 1]
 
-  const select = 'data, quantidade, passeios(nome, custo_pax, preco_venda_pax)'
+  const select = 'data, quantidade, passeios(nome, custo_pax)'
 
   async function load() {
     if (!supabase || !fetchLo || !fetchHi) return setLoading(false)
@@ -91,32 +86,30 @@ export default function Dashboard() {
   )
 
   const kpis = useMemo(() => {
-    let pessoas = 0, faturamento = 0, gasto = 0
+    let pessoas = 0, gasto = 0
     const dias = new Set()
     for (const r of filtered) {
       const p = r.passeios || {}
       pessoas += r.quantidade
-      faturamento += r.quantidade * Number(p.preco_venda_pax || 0)
       gasto += r.quantidade * Number(p.custo_pax || 0)
       if (r.quantidade > 0) dias.add(r.data)
     }
-    return { pessoas, faturamento, gasto, lucro: faturamento - gasto, dias: dias.size }
+    return { pessoas, gasto, custoMedio: pessoas > 0 ? gasto / pessoas : 0, dias: dias.size }
   }, [filtered])
 
-  // Faturamento x Gasto por passeio — passeios do dia/período SELECIONADO no filtro
+  // Custo por passeio — passeios do dia/período SELECIONADO no filtro
   const porPasseio = useMemo(() => {
     const acc = {}
     for (const r of filtered) {
       if (r.quantidade <= 0) continue
       const nome = r.passeios?.nome || '—'
-      const a = (acc[nome] ||= { nome, faturamento: 0, gasto: 0 })
-      a.faturamento += r.quantidade * Number(r.passeios?.preco_venda_pax || 0)
+      const a = (acc[nome] ||= { nome, gasto: 0 })
       a.gasto += r.quantidade * Number(r.passeios?.custo_pax || 0)
     }
-    return Object.values(acc).sort((a, b) => b.faturamento - a.faturamento)
+    return Object.values(acc).sort((a, b) => b.gasto - a.gasto)
   }, [filtered])
 
-  // Valores por dia — "dia": semana (seg→dom) da data selecionada; "período": cada dia do período
+  // Custo por dia — "dia": semana (seg→dom) da data selecionada; "período": cada dia do período
   const semana = useMemo(() => {
     const start = mode === 'dia' ? weekStart : from
     const end = mode === 'dia' ? addDays(weekStart, 6) : to
@@ -124,12 +117,11 @@ export default function Dashboard() {
     const byDate = {}
     for (let d = new Date(start); toISO(d) <= toISO(end); d = addDays(d, 1)) {
       const iso = toISO(d)
-      byDate[iso] = { data: iso, faturamento: 0, gasto: 0 }
+      byDate[iso] = { data: iso, gasto: 0 }
     }
     for (const r of rows) {
       if (!byDate[r.data]) continue
       const p = r.passeios || {}
-      byDate[r.data].faturamento += r.quantidade * Number(p.preco_venda_pax || 0)
       byDate[r.data].gasto += r.quantidade * Number(p.custo_pax || 0)
     }
     return Object.values(byDate)
@@ -142,12 +134,11 @@ export default function Dashboard() {
     const byDate = {}
     for (let i = 0; i < 30; i++) {
       const iso = toISO(addDays(ref, i))
-      byDate[iso] = { data: iso, faturamento: 0, gasto: 0 }
+      byDate[iso] = { data: iso, gasto: 0 }
     }
     for (const r of rows) {
       if (!byDate[r.data]) continue
       const p = r.passeios || {}
-      byDate[r.data].faturamento += r.quantidade * Number(p.preco_venda_pax || 0)
       byDate[r.data].gasto += r.quantidade * Number(p.custo_pax || 0)
     }
     return Object.values(byDate)
@@ -162,8 +153,8 @@ export default function Dashboard() {
         ? `${fmtBR(from)} → ${fmtBR(to)}`
         : 'Selecione o período'
 
-  const semanaTemDados = semana.some((d) => d.faturamento > 0)
-  const mesTemDados = proximos30.some((d) => d.faturamento > 0)
+  const semanaTemDados = semana.some((d) => d.gasto > 0)
+  const mesTemDados = proximos30.some((d) => d.gasto > 0)
 
   return (
     <div className="space-y-6">
@@ -171,7 +162,7 @@ export default function Dashboard() {
         <div>
           <h1 className="text-2xl font-bold">Dashboard</h1>
           <p className="text-sm text-slate-500 mt-0.5">
-            KPIs do período: {periodoLabel}
+            Custo do período: {periodoLabel}
             {mode === 'periodo' && kpis.dias > 0 && ` · ${kpis.dias} dia(s) com lançamento`}
           </p>
         </div>
@@ -188,15 +179,14 @@ export default function Dashboard() {
 
       {error && <p className="text-sm text-accent">{error}</p>}
 
-      <div className="grid gap-4 grid-cols-2 xl:grid-cols-4">
-        <Kpi label="Faturamento" value={money(kpis.faturamento)} tone="text-emerald-600" />
-        <Kpi label="Gasto" value={money(kpis.gasto)} tone="text-accent" />
-        <Kpi label="Lucro" value={money(kpis.lucro)} tone="text-brand-dark" />
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
+        <Kpi label="Custo de operação" value={money(kpis.gasto)} tone="text-brand-dark" />
+        <Kpi label="Custo médio /pessoa" value={money(kpis.custoMedio)} />
         <Kpi label="Pessoas" value={kpis.pessoas} />
       </div>
 
       <Card
-        title={mode === 'dia' ? 'Valores da semana' : 'Valores do período'}
+        title={mode === 'dia' ? 'Custo da semana' : 'Custo do período'}
         subtitle={mode === 'dia' ? 'Semana da data selecionada · segunda a domingo' : `Por dia · ${periodoLabel}`}
       >
         {!semanaTemDados ? (
@@ -217,20 +207,13 @@ export default function Dashboard() {
                 cursor={false}
                 content={<ChartTooltipContent valueFormatter={money} />}
               />
-              <RBar dataKey="faturamento" fill="var(--color-faturamento)" radius={4} />
-              <Line
-                dataKey="gasto"
-                type="monotone"
-                stroke="var(--color-gasto)"
-                strokeWidth={2}
-                dot={false}
-              />
+              <RBar dataKey="gasto" fill="var(--color-gasto)" radius={4} />
             </ComposedChart>
           </ChartContainer>
         )}
       </Card>
 
-      <Card title="Próximos 30 dias" subtitle="A partir da data selecionada · por dia">
+      <Card title="Próximos 30 dias" subtitle="Custo a partir da data selecionada · por dia">
         {!mesTemDados ? (
           <Empty loading={loading} text="Sem lançamentos nos próximos 30 dias." />
         ) : (
@@ -249,58 +232,36 @@ export default function Dashboard() {
                 cursor={false}
                 content={<ChartTooltipContent valueFormatter={money} />}
               />
-              <RBar dataKey="faturamento" fill="var(--color-faturamento)" radius={3} />
-              <Line
-                dataKey="gasto"
-                type="monotone"
-                stroke="var(--color-gasto)"
-                strokeWidth={2}
-                dot={false}
-              />
+              <RBar dataKey="gasto" fill="var(--color-gasto)" radius={3} />
             </ComposedChart>
           </ChartContainer>
         )}
       </Card>
 
-      <Card title="Faturamento x Gasto por passeio" subtitle={`Período selecionado · ${periodoLabel}`}>
+      <Card title="Custo por passeio" subtitle={`Período selecionado · ${periodoLabel}`}>
         {porPasseio.length === 0 ? (
           <Empty loading={loading} text="Nenhum passeio no período selecionado." />
         ) : (
-          <div className="h-72">
-            <BarChart data={porPasseio} xDataKey="nome" className="h-full" barGap={0.55}>
-              <Grid horizontal />
-              <Bar dataKey="faturamento" fill={NAVY} lineCap={8} />
-              <Bar dataKey="gasto" fill={RED} lineCap={8} />
-              <BarXAxis showAllLabels />
+          <div style={{ height: Math.max(260, porPasseio.length * 44) }}>
+            <BarChart
+              data={porPasseio}
+              xDataKey="nome"
+              orientation="horizontal"
+              className="h-full"
+              margin={{ top: 8, right: 24, bottom: 28, left: 210 }}
+              barGap={0.3}
+            >
+              <Grid vertical horizontal={false} />
+              <Bar dataKey="gasto" fill={NAVY} lineCap={8} />
+              <BarYAxis />
               <ChartTooltip
-                rows={(p) => [
-                  { color: NAVY, label: 'Faturamento', value: money(p.faturamento) },
-                  { color: RED, label: 'Gasto', value: money(p.gasto) },
-                ]}
+                rows={(p) => [{ color: NAVY, label: 'Custo', value: money(p.gasto) }]}
               />
             </BarChart>
-            <ChartLegend />
           </div>
         )}
       </Card>
     </div>
-  )
-}
-
-function ChartLegend() {
-  return (
-    <Legend
-      className="justify-center"
-      items={[
-        { label: 'Faturamento', color: NAVY },
-        { label: 'Gasto', color: RED },
-      ]}
-    >
-      <LegendItemComponent>
-        <LegendMarker />
-        <LegendLabel />
-      </LegendItemComponent>
-    </Legend>
   )
 }
 

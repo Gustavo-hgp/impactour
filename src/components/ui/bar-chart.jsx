@@ -608,7 +608,13 @@ export function BarYAxis({ showAllLabels = true, maxLabels = 20 }) {
             transform: 'translateY(-50%)',
           }}
         >
-          <span className="whitespace-nowrap text-chart-label text-xs">{item.label}</span>
+          <span
+            className="truncate text-chart-label text-xs"
+            style={{ maxWidth: '100%' }}
+            title={item.label}
+          >
+            {item.label}
+          </span>
         </div>
       ))}
     </div>,

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase.js'
 import { money } from '../lib/format.js'
 
-const emptyForm = { nome: '', custo_pax: '', preco_venda_pax: '' }
+const emptyForm = { nome: '', custo_pax: '' }
 
 export default function Passeios() {
   const [passeios, setPasseios] = useState([])
@@ -30,7 +30,7 @@ export default function Passeios() {
 
   function startEdit(p) {
     setEditId(p.id)
-    setForm({ nome: p.nome, custo_pax: p.custo_pax, preco_venda_pax: p.preco_venda_pax })
+    setForm({ nome: p.nome, custo_pax: p.custo_pax })
     nomeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
     nomeRef.current?.focus()
   }
@@ -46,7 +46,6 @@ export default function Passeios() {
     const payload = {
       nome: form.nome.trim(),
       custo_pax: Number(form.custo_pax) || 0,
-      preco_venda_pax: Number(form.preco_venda_pax) || 0,
     }
     if (!payload.nome) return setError('Informe o nome do passeio.')
 
@@ -70,9 +69,9 @@ export default function Passeios() {
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Passeios</h1>
 
-      <form onSubmit={save} className={`bg-white rounded-xl border p-4 grid gap-3 sm:grid-cols-4 items-end ${editId ? 'border-brand ring-2 ring-brand/30' : 'border-slate-200'}`}>
+      <form onSubmit={save} className={`bg-white rounded-xl border p-4 grid gap-3 sm:grid-cols-3 items-end ${editId ? 'border-brand ring-2 ring-brand/30' : 'border-slate-200'}`}>
         {editId && (
-          <p className="sm:col-span-4 text-sm font-medium text-brand-dark">
+          <p className="sm:col-span-3 text-sm font-medium text-brand-dark">
             Editando “{form.nome}”
           </p>
         )}
@@ -93,15 +92,7 @@ export default function Passeios() {
             placeholder="0,00"
           />
         </Field>
-        <Field label="Preço venda /pax">
-          <input
-            className="input" type="number" step="0.01" min="0"
-            value={form.preco_venda_pax}
-            onChange={(e) => setForm({ ...form, preco_venda_pax: e.target.value })}
-            placeholder="0,00"
-          />
-        </Field>
-        <div className="sm:col-span-4 flex gap-2">
+        <div className="sm:col-span-3 flex gap-2">
           <button className="btn-primary" type="submit">
             {editId ? 'Salvar alterações' : 'Adicionar passeio'}
           </button>
@@ -121,24 +112,20 @@ export default function Passeios() {
             <tr>
               <th className="px-4 py-2">Passeio</th>
               <th className="px-4 py-2 text-right">Custo /pax</th>
-              <th className="px-4 py-2 text-right">Preço venda /pax</th>
-              <th className="px-4 py-2 text-right">Margem /pax</th>
               <th className="px-4 py-2"></th>
             </tr>
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={5} className="px-4 py-6 text-center text-slate-400">Carregando…</td></tr>
+              <tr><td colSpan={3} className="px-4 py-6 text-center text-slate-400">Carregando…</td></tr>
             )}
             {!loading && passeios.length === 0 && (
-              <tr><td colSpan={5} className="px-4 py-6 text-center text-slate-400">Nenhum passeio cadastrado.</td></tr>
+              <tr><td colSpan={3} className="px-4 py-6 text-center text-slate-400">Nenhum passeio cadastrado.</td></tr>
             )}
             {passeios.map((p) => (
               <tr key={p.id} className="border-t border-slate-100">
                 <td className="px-4 py-2 font-medium">{p.nome}</td>
                 <td className="px-4 py-2 text-right">{money(p.custo_pax)}</td>
-                <td className="px-4 py-2 text-right">{money(p.preco_venda_pax)}</td>
-                <td className="px-4 py-2 text-right">{money(p.preco_venda_pax - p.custo_pax)}</td>
                 <td className="px-4 py-2 text-right whitespace-nowrap">
                   <button className="link" onClick={() => startEdit(p)}>Editar</button>
                   <button className="link text-red-600 ml-3" onClick={() => remove(p.id)}>Excluir</button>

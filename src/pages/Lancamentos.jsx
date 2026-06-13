@@ -28,7 +28,7 @@ export default function Lancamentos() {
     ;(async () => {
       const { data, error } = await supabase
         .from('passeios')
-        .select('id, nome, custo_pax, preco_venda_pax')
+        .select('id, nome, custo_pax')
         .eq('ativo', true)
         .order('nome')
       if (error) setError(error.message)
@@ -45,7 +45,7 @@ export default function Lancamentos() {
       setListLoading(true)
       let q = supabase
         .from('lancamentos')
-        .select('id, data, quantidade, passeio_id, passeios(nome, custo_pax, preco_venda_pax)', {
+        .select('id, data, quantidade, passeio_id, passeios(nome, custo_pax)', {
           count: 'exact',
         })
         .order('data', { ascending: false })
@@ -74,7 +74,7 @@ export default function Lancamentos() {
 
   const passeioSel = passeios.find((p) => String(p.id) === String(form.passeio_id))
   const qtd = parseInt(form.quantidade, 10) || 0
-  const previewFat = passeioSel ? qtd * Number(passeioSel.preco_venda_pax) : 0
+  const previewCusto = passeioSel ? qtd * Number(passeioSel.custo_pax) : 0
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
   async function save(e) {
@@ -163,8 +163,8 @@ export default function Lancamentos() {
         <div className="sm:col-span-4 flex items-center justify-between flex-wrap gap-3">
           <span className="text-sm text-slate-500">
             {passeioSel
-              ? `Faturamento: ${money(previewFat)}`
-              : 'Escolha um passeio para ver o faturamento.'}
+              ? `Custo: ${money(previewCusto)}`
+              : 'Escolha um passeio para ver o custo.'}
           </span>
           <div className="flex items-center gap-3">
             {editId && (
@@ -220,7 +220,7 @@ export default function Lancamentos() {
                 <th className="px-4 py-2">Data</th>
                 <th className="px-4 py-2">Passeio</th>
                 <th className="px-4 py-2 text-right">Pessoas</th>
-                <th className="px-4 py-2 text-right">Faturamento</th>
+                <th className="px-4 py-2 text-right">Custo</th>
                 <th className="px-4 py-2"></th>
               </tr>
             </thead>
@@ -246,7 +246,7 @@ export default function Lancamentos() {
                     <td className="px-4 py-2 font-medium">{l.passeios?.nome || '—'}</td>
                     <td className="px-4 py-2 text-right">{l.quantidade}</td>
                     <td className="px-4 py-2 text-right">
-                      {money(l.quantidade * Number(l.passeios?.preco_venda_pax || 0))}
+                      {money(l.quantidade * Number(l.passeios?.custo_pax || 0))}
                     </td>
                     <td className="px-4 py-2 text-right whitespace-nowrap">
                       <button className="link" onClick={() => editRow(l)}>
