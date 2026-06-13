@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Route, Routes, Navigate } from 'react-router-dom'
-import { LogOut, Menu, MountainSnow, X } from 'lucide-react'
+import { LogOut, Menu, X } from 'lucide-react'
 import Dashboard from './pages/Dashboard.jsx'
 import Lancamentos from './pages/Lancamentos.jsx'
 import Passeios from './pages/Passeios.jsx'
@@ -123,13 +123,8 @@ export default function App() {
 
 function Logo() {
   return (
-    <div className="flex items-center gap-2 select-none">
-      <span className="grid place-items-center h-9 w-9 rounded-full bg-brand text-white shadow-sm">
-        <MountainSnow className="h-5 w-5" />
-      </span>
-      <span className="text-xl font-extrabold tracking-tight text-brand-dark">
-        IMPAC<span className="text-accent">TOUR</span>
-      </span>
+    <div className="flex items-center select-none">
+      <img src="/logo.webp" alt="Impactour" className="h-8 w-auto" />
     </div>
   )
 }
