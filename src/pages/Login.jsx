@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { MountainSnow } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
 
 export default function Login() {
@@ -26,13 +25,8 @@ export default function Login() {
           onSubmit={handleSubmit}
           className="w-full max-w-sm bg-white rounded-xl border border-slate-200 p-6 space-y-4"
         >
-          <div className="flex items-center justify-center gap-2 select-none">
-            <span className="grid place-items-center h-9 w-9 rounded-full bg-brand text-white shadow-sm">
-              <MountainSnow className="h-5 w-5" />
-            </span>
-            <span className="text-xl font-extrabold tracking-tight text-brand-dark">
-              IMPAC<span className="text-accent">TOUR</span>
-            </span>
+          <div className="flex justify-center select-none">
+            <img src="/logo.webp" alt="Impactour" className="h-12 w-auto max-w-full" />
           </div>
           <p className="text-center text-sm text-slate-500">Entre para continuar</p>
 
