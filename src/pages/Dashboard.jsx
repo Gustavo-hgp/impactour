@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase.js'
-import { money } from '../lib/format.js'
+import { useCurrency } from '../lib/currency.jsx'
 import DateFilter from '../components/DateFilter.jsx'
 import { BarChart, Bar, BarYAxis, Grid, ChartTooltip } from '../components/ui/bar-chart.jsx'
 import { Bar as RBar, ComposedChart, CartesianGrid, XAxis } from 'recharts'
@@ -28,6 +28,7 @@ const weekdayBR = (iso) =>
 const dayMonth = (iso) => iso.slice(8) + '/' + iso.slice(5, 7)
 
 export default function Dashboard() {
+  const { formatMoney } = useCurrency()
   const [mode, setMode] = useState('dia') // 'dia' | 'periodo'
   const [single, setSingle] = useState(new Date())
   const [range, setRange] = useState({ from: addDays(new Date(), -6), to: new Date() })
@@ -180,8 +181,8 @@ export default function Dashboard() {
       {error && <p className="text-sm text-accent">{error}</p>}
 
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
-        <Kpi label="Custo de operação" value={money(kpis.gasto)} tone="text-brand-dark" />
-        <Kpi label="Custo médio /pessoa" value={money(kpis.custoMedio)} />
+        <Kpi label="Custo de operação" value={formatMoney(kpis.gasto)} tone="text-brand-dark" />
+        <Kpi label="Custo médio /pessoa" value={formatMoney(kpis.custoMedio)} />
         <Kpi label="Pessoas" value={kpis.pessoas} />
       </div>
 
@@ -205,7 +206,7 @@ export default function Dashboard() {
               />
               <RChartTooltip
                 cursor={false}
-                content={<ChartTooltipContent valueFormatter={money} />}
+                content={<ChartTooltipContent valueFormatter={formatMoney} />}
               />
               <RBar dataKey="gasto" fill="var(--color-gasto)" radius={4} />
             </ComposedChart>
@@ -230,7 +231,7 @@ export default function Dashboard() {
               />
               <RChartTooltip
                 cursor={false}
-                content={<ChartTooltipContent valueFormatter={money} />}
+                content={<ChartTooltipContent valueFormatter={formatMoney} />}
               />
               <RBar dataKey="gasto" fill="var(--color-gasto)" radius={3} />
             </ComposedChart>
@@ -255,7 +256,7 @@ export default function Dashboard() {
               <Bar dataKey="gasto" fill={NAVY} lineCap={8} />
               <BarYAxis />
               <ChartTooltip
-                rows={(p) => [{ color: NAVY, label: 'Custo', value: money(p.gasto) }]}
+                rows={(p) => [{ color: NAVY, label: 'Custo', value: formatMoney(p.gasto) }]}
               />
             </BarChart>
           </div>

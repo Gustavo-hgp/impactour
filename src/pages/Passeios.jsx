@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase.js'
-import { money } from '../lib/format.js'
+import { useCurrency } from '../lib/currency.jsx'
 
 const emptyForm = { nome: '', custo_pax: '' }
 
 export default function Passeios() {
+  const { formatMoney } = useCurrency()
   const [passeios, setPasseios] = useState([])
   const [form, setForm] = useState(emptyForm)
   const [editId, setEditId] = useState(null)
@@ -125,7 +126,7 @@ export default function Passeios() {
             {passeios.map((p) => (
               <tr key={p.id} className="border-t border-slate-100">
                 <td className="px-4 py-2 font-medium">{p.nome}</td>
-                <td className="px-4 py-2 text-right">{money(p.custo_pax)}</td>
+                <td className="px-4 py-2 text-right">{formatMoney(p.custo_pax)}</td>
                 <td className="px-4 py-2 text-right whitespace-nowrap">
                   <button className="link" onClick={() => startEdit(p)}>Editar</button>
                   <button className="link text-red-600 ml-3" onClick={() => remove(p.id)}>Excluir</button>

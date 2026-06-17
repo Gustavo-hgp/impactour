@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase.js'
-import { money, todayISO } from '../lib/format.js'
+import { todayISO } from '../lib/format.js'
+import { useCurrency } from '../lib/currency.jsx'
 import PasseioSelect from '../components/PasseioSelect.jsx'
 
 const PAGE_SIZE = 10
 const emptyForm = { passeio_id: '', data: todayISO(), quantidade: '' }
 
 export default function Lancamentos() {
+  const { formatMoney } = useCurrency()
   const [passeios, setPasseios] = useState([])
   const [lancamentos, setLancamentos] = useState([])
   const [total, setTotal] = useState(0)
@@ -163,7 +165,7 @@ export default function Lancamentos() {
         <div className="sm:col-span-4 flex items-center justify-between flex-wrap gap-3">
           <span className="text-sm text-slate-500">
             {passeioSel
-              ? `Custo: ${money(previewCusto)}`
+              ? `Custo: ${formatMoney(previewCusto)}`
               : 'Escolha um passeio para ver o custo.'}
           </span>
           <div className="flex items-center gap-3">
@@ -246,7 +248,7 @@ export default function Lancamentos() {
                     <td className="px-4 py-2 font-medium">{l.passeios?.nome || '—'}</td>
                     <td className="px-4 py-2 text-right">{l.quantidade}</td>
                     <td className="px-4 py-2 text-right">
-                      {money(l.quantidade * Number(l.passeios?.custo_pax || 0))}
+                      {formatMoney(l.quantidade * Number(l.passeios?.custo_pax || 0))}
                     </td>
                     <td className="px-4 py-2 text-right whitespace-nowrap">
                       <button className="link" onClick={() => editRow(l)}>
