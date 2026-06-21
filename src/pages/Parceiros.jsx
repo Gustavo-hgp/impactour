@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Plus, X } from 'lucide-react'
+import { ChevronDown, Plus, X } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
 import { useCurrency } from '../lib/currency.jsx'
 import { tipoServicoLabel } from '../lib/calc.js'
@@ -24,7 +24,15 @@ export default function Parceiros() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [aberto, setAberto] = useState(() => new Set())
   const nomeRef = useRef(null)
+
+  const togglePrecos = (id) =>
+    setAberto((s) => {
+      const next = new Set(s)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
 
   // Passeios (para os selects de preço) — uma vez.
   useEffect(() => {
@@ -120,13 +128,47 @@ export default function Parceiros() {
       return setError(res.error.message)
     }
     const parceiroId = res.data.id
-    // sincroniza preços: apaga e reinsere
-    await supabase.from('parceiro_precos').delete().eq('parceiro_id', parceiroId)
-    const ins = await supabase
+
+    // Sincroniza preços de forma segura:
+    // 1) lê o que já existe (só na edição);
+    // 2) upsert dos preços do form (chave única parceiro_id,passeio_id,tipo_servico) —
+    //    se falhar aqui, o parceiro continua com os preços antigos intactos;
+    // 3) só agora apaga os preços que sumiram da edição.
+    let existentes = []
+    if (editId) {
+      const r = await supabase
+        .from('parceiro_precos')
+        .select('id, passeio_id, tipo_servico')
+        .eq('parceiro_id', parceiroId)
+      if (!r.error) existentes = r.data || []
+    }
+
+    const ups = await supabase
       .from('parceiro_precos')
-      .insert(precos.map((p) => ({ parceiro_id: parceiroId, ...p })))
+      .upsert(
+        precos.map((p) => ({ parceiro_id: parceiroId, ...p })),
+        { onConflict: 'parceiro_id,passeio_id,tipo_servico' },
+      )
+    if (ups.error) {
+      setSaving(false)
+      return setError(ups.error.message)
+    }
+
+    if (existentes.length) {
+      const keep = new Set(precos.map((p) => `${p.passeio_id}|${p.tipo_servico}`))
+      const removerIds = existentes
+        .filter((e) => !keep.has(`${e.passeio_id}|${e.tipo_servico}`))
+        .map((e) => e.id)
+      if (removerIds.length) {
+        const del = await supabase.from('parceiro_precos').delete().in('id', removerIds)
+        if (del.error) {
+          setSaving(false)
+          return setError(del.error.message)
+        }
+      }
+    }
+
     setSaving(false)
-    if (ins.error) return setError(ins.error.message)
     cancelEdit()
     refresh()
   }
@@ -269,12 +311,14 @@ export default function Parceiros() {
                 <tr key={p.id} className="border-t border-slate-100 align-top">
                   <td className="px-4 py-2 font-medium">{p.nome}</td>
                   <td className="px-4 py-2 text-right">{p.qtd_maxima}</td>
-                  <td className="px-4 py-2 text-slate-600">
-                    {(p.parceiro_precos || []).length === 0
-                      ? '—'
-                      : p.parceiro_precos
-                          .map((pp) => `${pp.passeios?.nome || passeioNomeById(pp.passeio_id)} (${tipoServicoLabel(pp.tipo_servico)}): ${formatMoney(pp.valor)}`)
-                          .join(' · ')}
+                  <td className="px-4 py-2 text-slate-600 max-w-xs">
+                    <PrecosCelula
+                      precos={p.parceiro_precos || []}
+                      aberto={aberto.has(p.id)}
+                      onToggle={() => togglePrecos(p.id)}
+                      passeioNomeById={passeioNomeById}
+                      formatMoney={formatMoney}
+                    />
                   </td>
                   <td className="px-4 py-2 text-right whitespace-nowrap">
                     <button className="link" onClick={() => startEdit(p)}>Editar</button>
@@ -320,5 +364,57 @@ function Field({ label, className = '', children }) {
       <span className="block text-xs font-medium text-slate-500 mb-1">{label}</span>
       {children}
     </label>
+  )
+}
+
+const PREVIEW_N = 2
+
+function PrecosCelula({ precos, aberto, onToggle, passeioNomeById, formatMoney }) {
+  if (precos.length === 0) return <span>—</span>
+  const ordenados = aberto
+    ? [...precos].sort((a, b) => {
+        const na = a.passeios?.nome || passeioNomeById(a.passeio_id)
+        const nb = b.passeios?.nome || passeioNomeById(b.passeio_id)
+        return na.localeCompare(nb, 'pt-BR')
+      })
+    : precos
+  const label = `${precos.length} ${precos.length === 1 ? 'preço' : 'preços'}`
+  const previewItens = precos.slice(0, PREVIEW_N)
+
+  return (
+    <div className="min-w-0">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="inline-flex items-center gap-1 text-xs font-semibold text-brand-dark hover:underline"
+        aria-expanded={aberto}
+      >
+        {label}
+        <ChevronDown className={`h-3.5 w-3.5 transition ${aberto ? 'rotate-180' : ''}`} />
+      </button>
+
+      {!aberto && (
+        <p className="mt-0.5 text-xs text-slate-400 truncate">
+          {previewItens
+            .map((pp) => `${pp.passeios?.nome || passeioNomeById(pp.passeio_id)} · ${formatMoney(pp.valor)}`)
+            .join(' · ')}
+          {precos.length > PREVIEW_N && ' · …'}
+        </p>
+      )}
+
+      {aberto && (
+        <ul className="mt-2 max-h-56 overflow-y-auto pr-1 text-xs divide-y divide-slate-50">
+          {ordenados.map((pp, i) => (
+            <li key={`${pp.passeio_id}-${pp.tipo_servico}-${i}`} className="flex items-center justify-between gap-3 py-1">
+              <span className="truncate text-slate-600">
+                {pp.passeios?.nome || passeioNomeById(pp.passeio_id)}
+                <span className="text-slate-400"> · {tipoServicoLabel(pp.tipo_servico)}</span>
+              </span>
+              <span className="shrink-0 tabular-nums text-slate-700">{formatMoney(pp.valor)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   )
 }

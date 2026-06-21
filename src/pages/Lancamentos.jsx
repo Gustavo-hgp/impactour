@@ -4,7 +4,7 @@ import { todayISO } from '../lib/format.js'
 import { useCurrency } from '../lib/currency.jsx'
 import PasseioSelect from '../components/PasseioSelect.jsx'
 import PickList from '../components/PickList.jsx'
-import { custoReferencia, parceiroNome, passeioNome, tipoServicoLabel } from '../lib/calc.js'
+import { custoReal, parceiroNome, passeioNome, tipoServicoLabel } from '../lib/calc.js'
 
 const PAGE_SIZE = 10
 const emptyForm = { passeio_id: '', parceiro_id: '', tipo_servico: '', data: todayISO(), quantidade: '' }
@@ -140,7 +140,7 @@ export default function Lancamentos() {
     }
     const { error } = editId
       ? await supabase.from('lancamentos').update(row).eq('id', editId)
-      : await supabase.from('lancamentos').upsert(row, { onConflict: 'passeio_id,data' })
+      : await supabase.from('lancamentos').insert(row)
     setSaving(false)
     if (error) return setError(error.message)
     setMsg(editId ? 'Lançamento atualizado!' : 'Lançamento salvo!')
@@ -309,7 +309,7 @@ export default function Lancamentos() {
                 <th className="px-4 py-2">Passeio</th>
                 <th className="px-4 py-2">Parceiro</th>
                 <th className="px-4 py-2 text-right">Pessoas</th>
-                <th className="px-4 py-2 text-right">Custo (ref.)</th>
+                <th className="px-4 py-2 text-right">Custo</th>
                 <th className="px-4 py-2"></th>
               </tr>
             </thead>
@@ -337,7 +337,7 @@ export default function Lancamentos() {
                         : '—'}
                     </td>
                     <td className="px-4 py-2 text-right">{l.quantidade}</td>
-                    <td className="px-4 py-2 text-right">{formatMoney(custoReferencia(l))}</td>
+                    <td className="px-4 py-2 text-right">{formatMoney(custoReal(l))}</td>
                     <td className="px-4 py-2 text-right whitespace-nowrap">
                       <button className="link" onClick={() => editRow(l)}>Editar</button>
                       <button className="link text-accent ml-3" onClick={() => remove(l.id)}>Excluir</button>

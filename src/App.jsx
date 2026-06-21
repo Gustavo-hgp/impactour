@@ -96,7 +96,7 @@ export default function App() {
             <img src="/logo.webp" alt="Impactour" className="h-7 w-auto" />
           </div>
 
-          <main className="flex-1 w-full max-w-5xl mx-auto px-4 py-6">
+          <main className="flex-1 w-full max-w-7xl mx-auto px-4 py-6">
             {!supabaseConfigured && <ConfigWarning />}
             <Routes>
               <Route path="/" element={<Dashboard />} />

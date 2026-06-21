@@ -136,6 +136,10 @@ alter table lancamentos drop constraint if exists lancamentos_passeio_id_fkey;
 alter table lancamentos add constraint lancamentos_passeio_id_fkey
   foreign key (passeio_id) references passeios(id) on delete set null;
 
+-- Permite múltiplos lançamentos do mesmo passeio na mesma data (ex.: dois
+-- parceiros diferentes no mesmo dia, com preços distintos).
+alter table lancamentos drop constraint if exists lancamentos_passeio_id_data_key;
+
 -- Backfill dos lançamentos já existentes (só onde o snapshot ainda está nulo).
 update lancamentos l set custo_pax_ref = p.custo_pax, passeio_nome = p.nome
   from passeios p where l.passeio_id = p.id and l.custo_pax_ref is null;
