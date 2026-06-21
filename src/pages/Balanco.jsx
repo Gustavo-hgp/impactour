@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase.js'
 import { todayISO } from '../lib/format.js'
 import { useCurrency } from '../lib/currency.jsx'
+import MoneyInput from '../components/MoneyInput.jsx'
 
 const PAGE_SIZE = 10
 
@@ -173,14 +174,11 @@ export default function Balanco() {
         <label className="block">
           <span className="block text-xs font-medium text-slate-500 mb-1">Caixa atual (no banco hoje)</span>
           <div className="flex gap-2">
-            <input
-              type="number"
-              min="0"
-              step="0.01"
+            <MoneyInput
               className="input w-40"
               value={caixaInput}
-              onChange={(e) => setCaixaInput(e.target.value)}
-              placeholder="0"
+              onChange={setCaixaInput}
+              moeda={caixaMoeda}
             />
             <select className="input w-24" value={caixaMoeda} onChange={(e) => setCaixaMoeda(e.target.value)}>
               <option value="CLP">CLP</option>
@@ -234,14 +232,10 @@ export default function Balanco() {
           </Field>
           <Field label="Valor">
             <div className="flex gap-2">
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                className="input"
+              <MoneyInput
                 value={form.valor}
-                onChange={(e) => setForm({ ...form, valor: e.target.value })}
-                placeholder="0"
+                onChange={(v) => setForm({ ...form, valor: v })}
+                moeda={form.moeda}
               />
               <select className="input w-24" value={form.moeda} onChange={(e) => setForm({ ...form, moeda: e.target.value })}>
                 <option value="CLP">CLP</option>
