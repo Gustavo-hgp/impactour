@@ -72,7 +72,7 @@ export default function App() {
   }
 
   // Sem login não há acesso aos dados (as policies do banco exigem usuário autenticado).
-  if (false && supabaseConfigured && !session) {
+  if (supabaseConfigured && !session) {
     return <Login />
   }
 
