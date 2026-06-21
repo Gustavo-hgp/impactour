@@ -203,7 +203,7 @@ export default function Parceiros() {
               className="input"
               value={form.nome}
               onChange={(e) => setForm({ ...form, nome: e.target.value })}
-              placeholder="Ex.: Dudu"
+              placeholder="Insira o nome do parceiro..."
             />
           </Field>
           <Field label="Qtd. máx. de pessoas">
