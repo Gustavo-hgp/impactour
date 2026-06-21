@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase.js'
 import { useCurrency } from '../lib/currency.jsx'
+import MoneyInput from '../components/MoneyInput.jsx'
 
 const emptyForm = { nome: '', custo_pax: '' }
 
@@ -86,11 +87,10 @@ export default function Passeios() {
           />
         </Field>
         <Field label="Custo /pax">
-          <input
-            className="input" type="number" step="0.01" min="0"
+          <MoneyInput
             value={form.custo_pax}
-            onChange={(e) => setForm({ ...form, custo_pax: e.target.value })}
-            placeholder="0,00"
+            onChange={(v) => setForm({ ...form, custo_pax: v })}
+            moeda="CLP"
           />
         </Field>
         <div className="sm:col-span-3 flex gap-2">

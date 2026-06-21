@@ -3,6 +3,7 @@ import { ChevronDown, Plus, X } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
 import { useCurrency } from '../lib/currency.jsx'
 import { tipoServicoLabel } from '../lib/calc.js'
+import MoneyInput from '../components/MoneyInput.jsx'
 
 const PAGE_SIZE = 10
 const TIPOS = [
@@ -246,14 +247,11 @@ export default function Parceiros() {
                     <option key={t.v} value={t.v}>{t.label}</option>
                   ))}
                 </select>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
+                <MoneyInput
                   className="input w-32"
                   value={p.valor}
-                  onChange={(e) => setPreco(i, { valor: e.target.value })}
-                  placeholder="0,00"
+                  onChange={(v) => setPreco(i, { valor: v })}
+                  moeda="CLP"
                 />
                 <button
                   type="button"

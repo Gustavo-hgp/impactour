@@ -9,7 +9,7 @@ import {
   ChartTooltip as RChartTooltip,
   ChartTooltipContent,
 } from '../components/ui/chart.jsx'
-import { custoReferencia, passeioNome } from '../lib/calc.js'
+import { custoReal, passeioNome } from '../lib/calc.js'
 
 const NAVY = '#0a3fa8'
 
@@ -56,7 +56,7 @@ export default function Dashboard() {
   const fetchLo = fetchDates[0]
   const fetchHi = fetchDates[fetchDates.length - 1]
 
-  const select = 'data, quantidade, custo_pax_ref, passeio_nome, passeios(nome, custo_pax)'
+  const select = 'data, quantidade, valor_servico, custo_pax_ref, passeio_nome, passeios(nome, custo_pax)'
 
   async function load() {
     if (!supabase || !fetchLo || !fetchHi) return setLoading(false)
@@ -92,7 +92,7 @@ export default function Dashboard() {
     const dias = new Set()
     for (const r of filtered) {
       pessoas += r.quantidade
-      gasto += custoReferencia(r)
+      gasto += custoReal(r)
       if (r.quantidade > 0) dias.add(r.data)
     }
     return { pessoas, gasto, custoMedio: pessoas > 0 ? gasto / pessoas : 0, dias: dias.size }
@@ -105,7 +105,7 @@ export default function Dashboard() {
       if (r.quantidade <= 0) continue
       const nome = passeioNome(r)
       const a = (acc[nome] ||= { nome, gasto: 0 })
-      a.gasto += custoReferencia(r)
+      a.gasto += custoReal(r)
     }
     return Object.values(acc).sort((a, b) => b.gasto - a.gasto)
   }, [filtered])
@@ -122,7 +122,7 @@ export default function Dashboard() {
     }
     for (const r of rows) {
       if (!byDate[r.data]) continue
-      byDate[r.data].gasto += custoReferencia(r)
+      byDate[r.data].gasto += custoReal(r)
     }
     return Object.values(byDate)
       .sort((a, b) => a.data.localeCompare(b.data))
@@ -138,7 +138,7 @@ export default function Dashboard() {
     }
     for (const r of rows) {
       if (!byDate[r.data]) continue
-      byDate[r.data].gasto += custoReferencia(r)
+      byDate[r.data].gasto += custoReal(r)
     }
     return Object.values(byDate)
       .sort((a, b) => a.data.localeCompare(b.data))
