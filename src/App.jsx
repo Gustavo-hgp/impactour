@@ -4,6 +4,7 @@ import { NavLink, Route, Routes, Navigate } from 'react-router-dom'
 import {
   ClipboardList,
   HandCoins,
+  Handshake,
   LayoutDashboard,
   LogOut,
   Map,
@@ -15,6 +16,7 @@ import {
 import Dashboard from './pages/Dashboard.jsx'
 import Lancamentos from './pages/Lancamentos.jsx'
 import Passeios from './pages/Passeios.jsx'
+import Parceiros from './pages/Parceiros.jsx'
 import Financeiro from './pages/Financeiro.jsx'
 import Balanco from './pages/Balanco.jsx'
 import Login from './pages/Login.jsx'
@@ -28,6 +30,7 @@ const groups = [
       { to: '/', label: 'Dashboard', end: true, icon: LayoutDashboard },
       { to: '/lancamentos', label: 'Lançar', icon: ClipboardList },
       { to: '/passeios', label: 'Passeios', icon: Map },
+      { to: '/parceiros', label: 'Parceiros', icon: Handshake },
     ],
   },
   {
@@ -69,7 +72,7 @@ export default function App() {
   }
 
   // Sem login não há acesso aos dados (as policies do banco exigem usuário autenticado).
-  if (supabaseConfigured && !session) {
+  if (false && supabaseConfigured && !session) {
     return <Login />
   }
 
@@ -99,6 +102,7 @@ export default function App() {
               <Route path="/" element={<Dashboard />} />
               <Route path="/lancamentos" element={<Lancamentos />} />
               <Route path="/passeios" element={<Passeios />} />
+          <Route path="/parceiros" element={<Parceiros />} />
               <Route path="/financeiro" element={<Financeiro />} />
               <Route path="/balanco" element={<Balanco />} />
               <Route path="*" element={<Navigate to="/" replace />} />

@@ -9,6 +9,7 @@ import {
   ChartTooltip as RChartTooltip,
   ChartTooltipContent,
 } from '../components/ui/chart.jsx'
+import { custoReferencia, passeioNome } from '../lib/calc.js'
 
 const NAVY = '#0a3fa8'
 
@@ -55,7 +56,7 @@ export default function Dashboard() {
   const fetchLo = fetchDates[0]
   const fetchHi = fetchDates[fetchDates.length - 1]
 
-  const select = 'data, quantidade, passeios(nome, custo_pax)'
+  const select = 'data, quantidade, custo_pax_ref, passeio_nome, passeios(nome, custo_pax)'
 
   async function load() {
     if (!supabase || !fetchLo || !fetchHi) return setLoading(false)
@@ -90,9 +91,8 @@ export default function Dashboard() {
     let pessoas = 0, gasto = 0
     const dias = new Set()
     for (const r of filtered) {
-      const p = r.passeios || {}
       pessoas += r.quantidade
-      gasto += r.quantidade * Number(p.custo_pax || 0)
+      gasto += custoReferencia(r)
       if (r.quantidade > 0) dias.add(r.data)
     }
     return { pessoas, gasto, custoMedio: pessoas > 0 ? gasto / pessoas : 0, dias: dias.size }
@@ -103,9 +103,9 @@ export default function Dashboard() {
     const acc = {}
     for (const r of filtered) {
       if (r.quantidade <= 0) continue
-      const nome = r.passeios?.nome || '—'
+      const nome = passeioNome(r)
       const a = (acc[nome] ||= { nome, gasto: 0 })
-      a.gasto += r.quantidade * Number(r.passeios?.custo_pax || 0)
+      a.gasto += custoReferencia(r)
     }
     return Object.values(acc).sort((a, b) => b.gasto - a.gasto)
   }, [filtered])
@@ -122,8 +122,7 @@ export default function Dashboard() {
     }
     for (const r of rows) {
       if (!byDate[r.data]) continue
-      const p = r.passeios || {}
-      byDate[r.data].gasto += r.quantidade * Number(p.custo_pax || 0)
+      byDate[r.data].gasto += custoReferencia(r)
     }
     return Object.values(byDate)
       .sort((a, b) => a.data.localeCompare(b.data))
@@ -139,8 +138,7 @@ export default function Dashboard() {
     }
     for (const r of rows) {
       if (!byDate[r.data]) continue
-      const p = r.passeios || {}
-      byDate[r.data].gasto += r.quantidade * Number(p.custo_pax || 0)
+      byDate[r.data].gasto += custoReferencia(r)
     }
     return Object.values(byDate)
       .sort((a, b) => a.data.localeCompare(b.data))

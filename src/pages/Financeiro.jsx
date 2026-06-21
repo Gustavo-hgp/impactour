@@ -6,6 +6,7 @@ import { cn } from '../lib/utils.js'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '../components/ui/chart.jsx'
 import { DonutChart } from '../components/ui/DonutChart.jsx'
 import { LeaderboardPodium } from '../components/ui/LeaderboardPodium.jsx'
+import { custoReal, economiaLancamento, parceiroNome, passeioNome } from '../lib/calc.js'
 
 const MONTHS_PT = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
 const pad = (n) => String(n).padStart(2, '0')
@@ -102,7 +103,7 @@ export default function Financeiro() {
       const [lRes, bRes] = await Promise.all([
         supabase
           .from('lancamentos')
-          .select('data, quantidade, passeios(nome, custo_pax)')
+          .select('data, quantidade, parceiro_id, valor_servico, custo_pax_ref, passeio_nome, parceiro_nome, passeios(nome, custo_pax), parceiros(nome)')
           .gte('data', periodStart)
           .lte('data', periodEnd),
         supabase
@@ -126,12 +127,22 @@ export default function Financeiro() {
     }
   }, [startKey, endKey, months.length])
 
-  // Custos operacionais por mês (dos lançamentos — não inclui pagamentos do balanço).
+  // Custo REAL por mês: usa o valor do parceiro quando houver, senão a referência.
   const custosPorMes = useMemo(() => {
     const m = {}
     for (const r of lancRaw) {
       const k = r.data.slice(0, 7)
-      m[k] = (m[k] || 0) + r.quantidade * Number(r.passeios?.custo_pax || 0)
+      m[k] = (m[k] || 0) + custoReal(r)
+    }
+    return m
+  }, [lancRaw])
+
+  // Economia (referência − real) por mês — exclusiva do módulo financeiro.
+  const economiaPorMes = useMemo(() => {
+    const m = {}
+    for (const r of lancRaw) {
+      const k = r.data.slice(0, 7)
+      m[k] = (m[k] || 0) + economiaLancamento(r)
     }
     return m
   }, [lancRaw])
@@ -161,10 +172,10 @@ export default function Financeiro() {
     const acc = {}
     for (const r of lancRaw) {
       if (r.quantidade <= 0) continue
-      const nome = r.passeios?.nome || '—'
+      const nome = passeioNome(r)
       const a = (acc[nome] ||= { nome, pessoas: 0, custo: 0 })
       a.pessoas += r.quantidade
-      a.custo += r.quantidade * Number(r.passeios?.custo_pax || 0)
+      a.custo += custoReal(r)
     }
     return Object.values(acc)
   }, [lancRaw])
@@ -206,6 +217,24 @@ export default function Financeiro() {
     .map((p, i) => ({ userId: p.nome, userName: p.nome, rank: i + 1, value: p.pessoas }))
   const totalPessoas = perPasseio.reduce((s, p) => s + p.pessoas, 0)
 
+  // Economia com parceiros (só financeiro).
+  const economiaTotal = lancRaw.reduce((s, r) => s + economiaLancamento(r), 0)
+  const economiaData = months.map((k) => ({ mes: shortMes(k), economia: economiaPorMes[k] || 0 }))
+  const perParceiro = Object.values(
+    lancRaw.reduce((acc, r) => {
+      if (r.valor_servico == null) return acc
+      const nome = parceiroNome(r) || 'Parceiro'
+      ;(acc[nome] ||= { nome, economia: 0, usos: 0 })
+      acc[nome].economia += economiaLancamento(r)
+      acc[nome].usos += 1
+      return acc
+    }, {}),
+  )
+  const podiumParceiros = [...perParceiro]
+    .sort((a, b) => b.economia - a.economia)
+    .slice(0, 3)
+    .map((p, i) => ({ userId: p.nome, userName: p.nome, rank: i + 1, value: p.economia }))
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -229,7 +258,7 @@ export default function Financeiro() {
       {error && <p className="text-sm text-accent">{error}</p>}
 
       {/* KPIs */}
-      <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+      <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
         <Kpi label="Caixa atual" value={formatMoney(caixa)} sub="edite no Balanço" tone="text-brand-dark" />
         <Kpi label="Entradas" value={formatMoney(totalEntradas)} sub="recebido" tone="text-emerald-600" />
         <Kpi label="Saídas" value={formatMoney(totalSaidas)} sub="custos + pagamentos" tone="text-accent" />
@@ -244,6 +273,12 @@ export default function Financeiro() {
           value={formatMoney(saldoProjetado)}
           sub="caixa + entradas − saídas"
           tone={saldoProjetado < 0 ? 'text-accent' : 'text-brand-dark'}
+        />
+        <Kpi
+          label="Economia parceiros"
+          value={formatMoney(economiaTotal)}
+          sub="referência − real"
+          tone={economiaTotal > 0 ? 'text-emerald-600' : 'text-slate-800'}
         />
       </div>
 
@@ -377,6 +412,31 @@ export default function Financeiro() {
           ) : (
             <div className="pt-3">
               <LeaderboardPodium rankings={podiumRankings} size="sm" showAvatar={false} />
+            </div>
+          )}
+        </ChartCard>
+
+        <ChartCard title="Economia com parceiros" subtitle="Economia vs. referência, por mês">
+          {economiaData.length === 0 ? (
+            <Empty loading={loading} />
+          ) : (
+            <ChartContainer config={{ economia: { label: 'Economia', color: GREEN } }} className="aspect-auto h-56 w-full">
+              <ComposedChart data={economiaData} margin={{ top: 8, left: 12, right: 12 }}>
+                <CartesianGrid vertical={false} />
+                <XAxis dataKey="mes" tickLine={false} axisLine={false} tickMargin={8} />
+                <ChartTooltip cursor={false} content={<ChartTooltipContent valueFormatter={formatMoney} />} />
+                <Bar dataKey="economia" fill="var(--color-economia)" radius={4} />
+              </ComposedChart>
+            </ChartContainer>
+          )}
+        </ChartCard>
+
+        <ChartCard title="Parceiros mais econômicos" subtitle="Top por economia gerada no período">
+          {podiumParceiros.length === 0 ? (
+            <Empty loading={loading} text="Nenhum lançamento com parceiro no período." />
+          ) : (
+            <div className="pt-3">
+              <LeaderboardPodium rankings={podiumParceiros} size="sm" showAvatar={false} formatValue={formatMoney} />
             </div>
           )}
         </ChartCard>

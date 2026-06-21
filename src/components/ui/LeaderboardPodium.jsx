@@ -20,6 +20,7 @@ export const LeaderboardPodium = React.forwardRef(function LeaderboardPodium(
     showValue = true,
     showAvatar = true,
     medalStyle = 'classic',
+    formatValue = (v) => v.toLocaleString('pt-BR'),
     ...props
   },
   ref,
@@ -86,7 +87,7 @@ export const LeaderboardPodium = React.forwardRef(function LeaderboardPodium(
 
             {showValue && (
               <span className={cn('text-slate-500 tabular-nums', size === 'sm' ? 'text-xs' : 'text-sm')}>
-                {ranking.value.toLocaleString('pt-BR')}
+                {formatValue(ranking.value)}
               </span>
             )}
 
