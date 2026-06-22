@@ -102,9 +102,17 @@ export default function Lancamentos() {
   const precoSel = tiposDisponiveis.find((pp) => pp.tipo_servico === form.tipo_servico) || null
   const valorServico = precoSel ? Number(precoSel.valor) : 0
   const qtd = parseInt(form.quantidade, 10) || 0
-  const previewRef = passeioSel ? qtd * Number(passeioSel.custo_pax) : 0
+  const custoPaxRef = passeioSel ? Number(passeioSel.custo_pax) : 0
+  const previewRef = qtd * custoPaxRef
   const semPreco = parceiroSel && passeioSel && tiposDisponiveis.length === 0
   const excedeMax = parceiroSel && parceiroSel.qtd_maxima > 0 && qtd > parceiroSel.qtd_maxima
+  // KPIs do form — só fazem sentido quando há parceiro+preço selecionado
+  const temParceria = Boolean(parceiroSel && precoSel && qtd > 0)
+  const cupoParceiroPP = temParceria ? valorServico / qtd : 0
+  const economizadoPP = temParceria ? custoPaxRef - cupoParceiroPP : 0
+  const economiaTotal = temParceria ? previewRef - valorServico : 0
+  const pontoEquilibrio =
+    parceiroSel && precoSel && custoPaxRef > 0 ? Math.ceil(valorServico / custoPaxRef) : 0
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
   // Se só há um tipo de serviço pra esse parceiro+passeio, já seleciona.
@@ -244,6 +252,29 @@ export default function Lancamentos() {
           <p className="sm:col-span-6 text-sm text-accent">
             Atenção: {qtd} pessoas excede a capacidade do parceiro (máx {parceiroSel.qtd_maxima}).
           </p>
+        )}
+
+        {parceiroSel && precoSel && (
+          <div className="sm:col-span-6 bg-slate-50 rounded-lg p-3 grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <Kpi
+              label="Cupo do parceiro /pessoa"
+              value={formatMoney(cupoParceiroPP)}
+            />
+            <Kpi
+              label="Economizado /pessoa"
+              value={formatMoney(economizadoPP)}
+              tone={economizadoPP < 0 ? 'text-accent' : 'text-emerald-600'}
+            />
+            <Kpi
+              label="Economia total"
+              value={formatMoney(economiaTotal)}
+              tone={economiaTotal < 0 ? 'text-accent' : 'text-emerald-600'}
+            />
+            <Kpi
+              label="Ponto de equilíbrio"
+              value={`${pontoEquilibrio.toLocaleString('pt-BR')} pessoas`}
+            />
+          </div>
         )}
 
         <div className="sm:col-span-6 flex items-center justify-between flex-wrap gap-3">
@@ -387,5 +418,14 @@ function Field({ label, className = '', children }) {
       <span className="block text-xs font-medium text-slate-500 mb-1">{label}</span>
       {children}
     </label>
+  )
+}
+
+function Kpi({ label, value, tone = 'text-slate-800' }) {
+  return (
+    <div>
+      <div className="text-xs text-slate-400">{label}</div>
+      <div className={`text-lg font-bold ${tone}`}>{value}</div>
+    </div>
   )
 }

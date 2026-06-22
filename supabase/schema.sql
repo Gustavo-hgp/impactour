@@ -145,3 +145,31 @@ update lancamentos l set custo_pax_ref = p.custo_pax, passeio_nome = p.nome
   from passeios p where l.passeio_id = p.id and l.custo_pax_ref is null;
 update lancamentos l set parceiro_nome = pa.nome
   from parceiros pa where l.parceiro_id = pa.id and l.parceiro_nome is null;
+
+-- ── Saldos do caixa (múltiplas contas / moedas) ─────────────────────────────
+-- Substitui o caixa_atual único da tabela `config`. Cada saldo é uma entrada
+-- independente (descrição + moeda + valor). O "caixa atual" exibido na app é a
+-- SOMA convertida para CLP via taxas configuradas em `config` (taxa_usd/taxa_brl).
+create table if not exists saldos_caixa (
+  id          bigint generated always as identity primary key,
+  descricao   text,
+  valor       numeric(14,2) not null default 0 check (valor >= 0),
+  moeda       text not null default 'CLP',
+  created_at  timestamptz not null default now()
+);
+
+alter table saldos_caixa enable row level security;
+drop policy if exists "authenticated full access saldos_caixa" on saldos_caixa;
+create policy "authenticated full access saldos_caixa" on saldos_caixa
+  for all to authenticated using (true) with check (true);
+
+-- Backfill idempotente: migra o caixa_atual antigo só se a tabela estiver vazia.
+do $$
+begin
+  if not exists (select 1 from saldos_caixa)
+     and exists (select 1 from config where chave = 'caixa_atual' and valor > 0) then
+    insert into saldos_caixa (descricao, valor, moeda)
+    select 'Caixa inicial', valor, coalesce(texto, 'CLP')
+    from config where chave = 'caixa_atual';
+  end if;
+end $$;
