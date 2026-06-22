@@ -23,11 +23,14 @@ export default function Balanco() {
   const [msg, setMsg] = useState('')
   const [error, setError] = useState('')
 
-  // Caixa atual.
-  const [caixaInput, setCaixaInput] = useState('')
-  const [caixaMoeda, setCaixaMoeda] = useState('CLP')
-  const [savingCaixa, setSavingCaixa] = useState(false)
-  const [caixaMsg, setCaixaMsg] = useState('')
+  // Caixa atual — agora composto por múltiplos saldos (várias contas/moedas).
+  const [saldos, setSaldos] = useState([])
+  const [saldoTick, setSaldoTick] = useState(0)
+  const [saldoForm, setSaldoForm] = useState({ descricao: '', valor: '', moeda: currency })
+  const [saldoEditId, setSaldoEditId] = useState(null)
+  const [saldoSaving, setSaldoSaving] = useState(false)
+  const [saldoMsg, setSaldoMsg] = useState('')
+  const [saldoError, setSaldoError] = useState('')
 
   // Lançamentos — 10 por página, filtráveis por data.
   useEffect(() => {
@@ -66,32 +69,69 @@ export default function Balanco() {
 
   useEffect(() => {
     if (!supabase) return
+    let cancelled = false
     ;(async () => {
       const { data } = await supabase
-        .from('config')
-        .select('valor, texto')
-        .eq('chave', 'caixa_atual')
-        .maybeSingle()
-      if (data) {
-        setCaixaInput(data.valor ? String(data.valor) : '')
-        if (data.texto) setCaixaMoeda(data.texto)
-      }
+        .from('saldos_caixa')
+        .select('id, descricao, valor, moeda')
+        .order('created_at')
+      if (!cancelled && data) setSaldos(data)
     })()
-  }, [])
+    return () => {
+      cancelled = true
+    }
+  }, [saldoTick])
 
   const refreshList = () => setTick((t) => t + 1)
+  const refreshSaldos = () => setSaldoTick((t) => t + 1)
 
-  async function saveCaixa(e) {
+  async function saveSaldo(e) {
     e.preventDefault()
-    if (!supabase) return
-    setSavingCaixa(true)
-    setCaixaMsg('')
-    const v = Math.max(0, Number(caixaInput) || 0)
-    const { error } = await supabase
-      .from('config')
-      .upsert({ chave: 'caixa_atual', valor: v, texto: caixaMoeda }, { onConflict: 'chave' })
-    setSavingCaixa(false)
-    setCaixaMsg(error ? 'Erro ao salvar.' : 'Caixa atualizado!')
+    setSaldoError('')
+    setSaldoMsg('')
+    const v = Math.max(0, Number(saldoForm.valor) || 0)
+    if (v <= 0) return setSaldoError('Informe um valor maior que zero.')
+    setSaldoSaving(true)
+    const row = {
+      descricao: saldoForm.descricao.trim() || null,
+      valor: v,
+      moeda: saldoForm.moeda,
+    }
+    const { error } = saldoEditId
+      ? await supabase.from('saldos_caixa').update(row).eq('id', saldoEditId)
+      : await supabase.from('saldos_caixa').insert(row)
+    setSaldoSaving(false)
+    if (error) return setSaldoError(error.message)
+    setSaldoMsg(saldoEditId ? 'Saldo atualizado!' : 'Saldo adicionado!')
+    setSaldoEditId(null)
+    setSaldoForm({ descricao: '', valor: '', moeda: currency })
+    refreshSaldos()
+  }
+
+  function editSaldo(s) {
+    setSaldoMsg('')
+    setSaldoError('')
+    setSaldoEditId(s.id)
+    setSaldoForm({
+      descricao: s.descricao || '',
+      valor: String(s.valor),
+      moeda: s.moeda || 'CLP',
+    })
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function cancelSaldoEdit() {
+    setSaldoEditId(null)
+    setSaldoForm({ descricao: '', valor: '', moeda: currency })
+    setSaldoMsg('')
+    setSaldoError('')
+  }
+
+  async function removeSaldo(id) {
+    if (!confirm('Excluir este saldo?')) return
+    const { error } = await supabase.from('saldos_caixa').delete().eq('id', id)
+    if (error) return setSaldoError(error.message)
+    refreshSaldos()
   }
 
   async function save(e) {
@@ -149,7 +189,10 @@ export default function Balanco() {
   const fmtData = (iso) => iso.split('-').reverse().join('/')
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
   const previewCLP = toCLP(form.valor, form.moeda)
-  const caixaCLP = toCLP(caixaInput, caixaMoeda)
+  const totalCaixaCLP = useMemo(
+    () => saldos.reduce((s, r) => s + toCLP(r.valor, r.moeda), 0),
+    [saldos, toCLP],
+  )
   const { entradasCLP, saidasCLP, saldoCLP } = useMemo(() => {
     const entradas = totaisRaw.filter((r) => r.tipo !== 'pago').reduce((s, r) => s + toCLP(r.valor, r.moeda), 0)
     const saidas = totaisRaw.filter((r) => r.tipo === 'pago').reduce((s, r) => s + toCLP(r.valor, r.moeda), 0)
@@ -166,35 +209,90 @@ export default function Balanco() {
         </p>
       </div>
 
-      {/* Caixa atual */}
-      <form
-        onSubmit={saveCaixa}
-        className="bg-white rounded-xl border border-slate-200 p-4 flex items-end gap-3 flex-wrap"
-      >
-        <label className="block">
-          <span className="block text-xs font-medium text-slate-500 mb-1">Caixa atual (no banco hoje)</span>
-          <div className="flex gap-2">
-            <MoneyInput
-              className="input w-40"
-              value={caixaInput}
-              onChange={setCaixaInput}
-              moeda={caixaMoeda}
-            />
-            <select className="input w-24" value={caixaMoeda} onChange={(e) => setCaixaMoeda(e.target.value)}>
-              <option value="CLP">CLP</option>
-              <option value="USD">US$</option>
-              <option value="BRL">R$</option>
-            </select>
+      {/* Caixa atual — soma de múltiplos saldos */}
+      <section className="bg-white rounded-xl border border-slate-200 p-4 space-y-4">
+        <div>
+          <p className="text-xs uppercase tracking-wide text-slate-400">Caixa atual</p>
+          <p className="text-3xl font-bold text-brand-dark">{formatMoney(totalCaixaCLP)}</p>
+          <p className="text-xs text-slate-500 mt-1">
+            Soma de {saldos.length} saldo{saldos.length === 1 ? '' : 's'} · convertido para a moeda selecionada no topo
+          </p>
+        </div>
+
+        <form
+          onSubmit={saveSaldo}
+          className={`rounded-lg border p-3 ${saldoEditId ? 'border-brand ring-2 ring-brand/30' : 'border-slate-200'}`}
+        >
+          {saldoEditId && (
+            <p className="mb-2 text-sm font-medium text-brand-dark">Editando saldo</p>
+          )}
+          <div className="grid gap-3 sm:grid-cols-[1fr_auto_auto_auto] items-end">
+            <Field label="Descrição (opcional)">
+              <input
+                type="text"
+                className="input"
+                value={saldoForm.descricao}
+                onChange={(e) => setSaldoForm({ ...saldoForm, descricao: e.target.value })}
+                placeholder="Ex.: Conta Itaú, Caixa CLP, Wise USD"
+              />
+            </Field>
+            <Field label="Valor">
+              <MoneyInput
+                className="input w-36"
+                value={saldoForm.valor}
+                onChange={(v) => setSaldoForm({ ...saldoForm, valor: v })}
+                moeda={saldoForm.moeda}
+              />
+            </Field>
+            <Field label="Moeda">
+              <select
+                className="input w-24"
+                value={saldoForm.moeda}
+                onChange={(e) => setSaldoForm({ ...saldoForm, moeda: e.target.value })}
+              >
+                <option value="CLP">CLP</option>
+                <option value="USD">US$</option>
+                <option value="BRL">R$</option>
+              </select>
+            </Field>
+            <div className="flex gap-2">
+              {saldoEditId && (
+                <button type="button" className="btn-ghost" onClick={cancelSaldoEdit}>
+                  Cancelar
+                </button>
+              )}
+              <button className="btn-primary whitespace-nowrap" type="submit" disabled={saldoSaving}>
+                {saldoSaving ? 'Salvando…' : saldoEditId ? 'Salvar' : 'Adicionar saldo'}
+              </button>
+            </div>
           </div>
-        </label>
-        <button className="btn-primary" type="submit" disabled={savingCaixa}>
-          {savingCaixa ? 'Salvando…' : 'Atualizar caixa'}
-        </button>
-        {caixaMsg && <span className="text-sm text-green-600">{caixaMsg}</span>}
-        <span className="text-sm text-slate-500 ml-auto">
-          Convertido: <strong className="text-brand-dark">{formatMoney(caixaCLP)}</strong>
-        </span>
-      </form>
+          {saldoMsg && <p className="mt-2 text-sm text-green-600">{saldoMsg}</p>}
+          {saldoError && <p className="mt-2 text-sm text-accent">{saldoError}</p>}
+        </form>
+
+        {saldos.length > 0 && (
+          <ul className="divide-y divide-slate-100 border border-slate-200 rounded-lg overflow-hidden">
+            {saldos.map((s) => {
+              const emCLP = toCLP(s.valor, s.moeda)
+              return (
+                <li key={s.id} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-slate-700 truncate">{s.descricao || 'Sem descrição'}</p>
+                    <p className="text-xs text-slate-500">
+                      {formatIn(s.valor, s.moeda)}
+                      {s.moeda !== 'CLP' && <span className="text-slate-400"> · {formatMoney(emCLP)}</span>}
+                    </p>
+                  </div>
+                  <div className="shrink-0 flex items-center gap-3">
+                    <button className="link" onClick={() => editSaldo(s)}>Editar</button>
+                    <button className="link text-accent" onClick={() => removeSaldo(s.id)}>Excluir</button>
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </section>
 
       <h2 className="text-sm font-semibold text-slate-600 -mb-2">Lançar entrada ou saída</h2>
 

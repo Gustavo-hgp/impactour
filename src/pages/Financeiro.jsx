@@ -54,8 +54,7 @@ export default function Financeiro() {
   const [customFrom, setCustomFrom] = useState(cur)
   const [customTo, setCustomTo] = useState(addMonthsKey(cur, 5))
 
-  const [caixaInput, setCaixaInput] = useState('')
-  const [caixaMoeda, setCaixaMoeda] = useState('CLP')
+  const [saldos, setSaldos] = useState([])
 
   const [lancRaw, setLancRaw] = useState([])
   const [balRaw, setBalRaw] = useState([])
@@ -70,22 +69,22 @@ export default function Financeiro() {
     [startKey, endKey],
   )
 
-  const caixa = toCLP(caixaInput, caixaMoeda)
+  // Caixa atual = soma dos saldos em CLP (edição no Balanço).
+  const caixa = useMemo(
+    () => saldos.reduce((s, r) => s + toCLP(r.valor, r.moeda), 0),
+    [saldos, toCLP],
+  )
 
-  // Caixa atual (config) — só leitura aqui; a edição fica no Balanço.
   useEffect(() => {
     if (!supabase) return
+    let cancelled = false
     ;(async () => {
-      const { data } = await supabase
-        .from('config')
-        .select('valor, texto')
-        .eq('chave', 'caixa_atual')
-        .maybeSingle()
-      if (data) {
-        setCaixaInput(data.valor ? String(data.valor) : '')
-        if (data.texto) setCaixaMoeda(data.texto)
-      }
+      const { data } = await supabase.from('saldos_caixa').select('valor, moeda')
+      if (!cancelled && data) setSaldos(data)
     })()
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   // Lançamentos (operação) + balanço (entradas/saídas) do período.
