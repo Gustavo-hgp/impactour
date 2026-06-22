@@ -173,3 +173,76 @@ begin
     from config where chave = 'caixa_atual';
   end if;
 end $$;
+
+-- ── Despesas fixas ──────────────────────────────────────────────────────────
+-- Cadastro de funcionários (pessoas) e fornecedores. As despesas fixas
+-- (salário, aluguel, internet, contador…) ficam em uma tabela dedicada e podem
+-- referenciar uma pessoa OU um fornecedor OU nenhum (despesa standalone).
+-- Comissões são lançamentos avulsos por pessoa, com valor livre.
+
+create table if not exists pessoas (
+  id          bigint generated always as identity primary key,
+  nome        text not null,
+  ativo       boolean not null default true,
+  created_at  timestamptz not null default now()
+);
+
+create table if not exists fornecedores (
+  id          bigint generated always as identity primary key,
+  nome        text not null,
+  ativo       boolean not null default true,
+  created_at  timestamptz not null default now()
+);
+
+create table if not exists despesas_fixas (
+  id              bigint generated always as identity primary key,
+  descricao       text not null,
+  valor           numeric(14,2) not null default 0 check (valor >= 0),
+  moeda           text not null default 'CLP',
+  dia_vencimento  smallint check (dia_vencimento between 1 and 31),
+  pessoa_id       bigint references pessoas(id) on delete set null,
+  fornecedor_id   bigint references fornecedores(id) on delete set null,
+  vigente_desde   date not null default current_date,
+  vigente_ate     date,
+  created_at      timestamptz not null default now()
+);
+
+create table if not exists comissoes (
+  id          bigint generated always as identity primary key,
+  pessoa_id   bigint not null references pessoas(id) on delete cascade,
+  data        date not null,
+  descricao   text,
+  valor       numeric(14,2) not null default 0 check (valor >= 0),
+  moeda       text not null default 'CLP',
+  pago_em     date,
+  created_at  timestamptz not null default now()
+);
+
+create index if not exists idx_comissoes_pessoa on comissoes(pessoa_id);
+create index if not exists idx_despesas_fixas_vigente on despesas_fixas(vigente_desde, vigente_ate);
+
+-- Amarra o pagamento ao mês de competência da despesa fixa, evitando dupla
+-- contagem entre "saída prevista" (pendência) e "saída efetuada" (recebimento).
+alter table recebimentos add column if not exists despesa_fixa_id bigint references despesas_fixas(id) on delete set null;
+alter table recebimentos add column if not exists mes_ref date;
+create index if not exists idx_recebimentos_despesa_mes on recebimentos(despesa_fixa_id, mes_ref);
+
+alter table pessoas enable row level security;
+drop policy if exists "authenticated full access pessoas" on pessoas;
+create policy "authenticated full access pessoas" on pessoas
+  for all to authenticated using (true) with check (true);
+
+alter table fornecedores enable row level security;
+drop policy if exists "authenticated full access fornecedores" on fornecedores;
+create policy "authenticated full access fornecedores" on fornecedores
+  for all to authenticated using (true) with check (true);
+
+alter table despesas_fixas enable row level security;
+drop policy if exists "authenticated full access despesas_fixas" on despesas_fixas;
+create policy "authenticated full access despesas_fixas" on despesas_fixas
+  for all to authenticated using (true) with check (true);
+
+alter table comissoes enable row level security;
+drop policy if exists "authenticated full access comissoes" on comissoes;
+create policy "authenticated full access comissoes" on comissoes
+  for all to authenticated using (true) with check (true);

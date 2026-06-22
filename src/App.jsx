@@ -9,7 +9,10 @@ import {
   LogOut,
   Map,
   Menu,
+  Receipt,
   Settings,
+  Truck,
+  Users,
   Wallet,
   X,
 } from 'lucide-react'
@@ -19,11 +22,21 @@ import Passeios from './pages/Passeios.jsx'
 import Parceiros from './pages/Parceiros.jsx'
 import Financeiro from './pages/Financeiro.jsx'
 import Balanco from './pages/Balanco.jsx'
+import Pessoas from './pages/Pessoas.jsx'
+import Fornecedores from './pages/Fornecedores.jsx'
+import DespesasFixas from './pages/DespesasFixas.jsx'
 import Login from './pages/Login.jsx'
 import { CurrencyProvider, useCurrency, CURRENCIES } from './lib/currency.jsx'
 import { supabase, supabaseConfigured } from './lib/supabase.js'
 
 const groups = [
+  {
+    title: 'Financeiro',
+    links: [
+      { to: '/financeiro', label: 'Visão Financeira', icon: Wallet },
+      { to: '/balanco', label: 'Balanço Financeiro', icon: HandCoins },
+    ],
+  },
   {
     title: 'Operacional',
     links: [
@@ -34,10 +47,11 @@ const groups = [
     ],
   },
   {
-    title: 'Financeiro',
+    title: 'Despesas Fixas',
     links: [
-      { to: '/financeiro', label: 'Visão Financeira', icon: Wallet },
-      { to: '/balanco', label: 'Balanço Financeiro', icon: HandCoins },
+      { to: '/despesas-fixas', label: 'Despesas fixas', icon: Receipt },
+      { to: '/pessoas', label: 'Pessoas', icon: Users },
+      { to: '/fornecedores', label: 'Fornecedores', icon: Truck },
     ],
   },
 ]
@@ -102,9 +116,12 @@ export default function App() {
               <Route path="/" element={<Dashboard />} />
               <Route path="/lancamentos" element={<Lancamentos />} />
               <Route path="/passeios" element={<Passeios />} />
-          <Route path="/parceiros" element={<Parceiros />} />
+              <Route path="/parceiros" element={<Parceiros />} />
               <Route path="/financeiro" element={<Financeiro />} />
               <Route path="/balanco" element={<Balanco />} />
+              <Route path="/pessoas" element={<Pessoas />} />
+              <Route path="/fornecedores" element={<Fornecedores />} />
+              <Route path="/despesas-fixas" element={<DespesasFixas />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </main>
