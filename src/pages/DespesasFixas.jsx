@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { CheckCircle2 } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
 import { todayISO } from '../lib/format.js'
 import { useCurrency } from '../lib/currency.jsx'
@@ -231,10 +232,11 @@ export default function DespesasFixas() {
   )
 
   async function marcarComoPaga(p) {
-    const today = todayISO()
     const descricaoPagamento = `${p.despesa.descricao} - ${monthLabel(p.mes_ref)}`
+    const valorTxt = formatIn(p.despesa.valor, p.despesa.moeda)
+    if (!confirm(`Marcar "${descricaoPagamento}" como paga?\n\nUma saída de ${valorTxt} será lançada hoje no caixa.`)) return
     const { error } = await supabase.from('recebimentos').insert({
-      data: today,
+      data: todayISO(),
       valor: p.despesa.valor,
       moeda: p.despesa.moeda,
       tipo: 'pago',
@@ -463,10 +465,12 @@ export default function DespesasFixas() {
                 </div>
                 <button
                   type="button"
-                  className="btn-primary py-1.5 px-3 text-xs whitespace-nowrap"
+                  className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition"
                   onClick={() => marcarComoPaga(p)}
+                  title="Marcar como paga"
+                  aria-label="Marcar como paga"
                 >
-                  Marcar como paga
+                  <CheckCircle2 className="h-6 w-6" />
                 </button>
               </li>
             ))}

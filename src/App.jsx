@@ -31,6 +31,13 @@ import { supabase, supabaseConfigured } from './lib/supabase.js'
 
 const groups = [
   {
+    title: 'Financeiro',
+    links: [
+      { to: '/financeiro', label: 'Visão Financeira', icon: Wallet },
+      { to: '/balanco', label: 'Balanço Financeiro', icon: HandCoins },
+    ],
+  },
+  {
     title: 'Operacional',
     links: [
       { to: '/', label: 'Dashboard', end: true, icon: LayoutDashboard },
@@ -40,18 +47,11 @@ const groups = [
     ],
   },
   {
-    title: 'Financeiro',
-    links: [
-      { to: '/financeiro', label: 'Visão Financeira', icon: Wallet },
-      { to: '/balanco', label: 'Balanço Financeiro', icon: HandCoins },
-    ],
-  },
-  {
     title: 'Despesas Fixas',
     links: [
+      { to: '/despesas-fixas', label: 'Despesas fixas', icon: Receipt },
       { to: '/pessoas', label: 'Pessoas', icon: Users },
       { to: '/fornecedores', label: 'Fornecedores', icon: Truck },
-      { to: '/despesas-fixas', label: 'Despesas fixas', icon: Receipt },
     ],
   },
 ]
