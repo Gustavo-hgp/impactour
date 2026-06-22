@@ -58,6 +58,8 @@ export default function Financeiro() {
 
   const [lancRaw, setLancRaw] = useState([])
   const [balRaw, setBalRaw] = useState([])
+  const [despesasFixas, setDespesasFixas] = useState([])
+  const [comissoesPeriodo, setComissoesPeriodo] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -99,7 +101,7 @@ export default function Financeiro() {
       setError('')
       const periodStart = firstDayISO(startKey)
       const periodEnd = lastDayISO(endKey)
-      const [lRes, bRes] = await Promise.all([
+      const [lRes, bRes, dRes, cRes] = await Promise.all([
         supabase
           .from('lancamentos')
           .select('data, quantidade, parceiro_id, valor_servico, custo_pax_ref, passeio_nome, parceiro_nome, passeios(nome, custo_pax), parceiros(nome)')
@@ -107,7 +109,14 @@ export default function Financeiro() {
           .lte('data', periodEnd),
         supabase
           .from('recebimentos')
-          .select('data, valor, moeda, tipo')
+          .select('data, valor, moeda, tipo, despesa_fixa_id, mes_ref')
+          .gte('data', periodStart)
+          .lte('data', periodEnd),
+        // Todas as despesas fixas: precisa avaliar vigência em cada mês do range.
+        supabase.from('despesas_fixas').select('id, valor, moeda, vigente_desde, vigente_ate'),
+        supabase
+          .from('comissoes')
+          .select('data, valor, moeda')
           .gte('data', periodStart)
           .lte('data', periodEnd),
       ])
@@ -119,6 +128,8 @@ export default function Financeiro() {
       }
       setLancRaw(lRes.data || [])
       setBalRaw(bRes.error ? [] : bRes.data || [])
+      setDespesasFixas(dRes.error ? [] : dRes.data || [])
+      setComissoesPeriodo(cRes.error ? [] : cRes.data || [])
       setLoading(false)
     })()
     return () => {
@@ -157,15 +168,41 @@ export default function Financeiro() {
     return m
   }, [balRaw, toCLP])
 
+  // Saídas/mês = recebimentos(pago) + comissões com data no mês + despesas fixas
+  // pendentes (vigentes no mês E sem recebimento amarrado por mes_ref).
   const pagosPorMes = useMemo(() => {
     const m = {}
+    // 1) Recebimentos do tipo "pago" (inclui pagamentos de despesa fixa já efetuados).
     for (const r of balRaw) {
       if (r.tipo !== 'pago') continue
       const k = r.data.slice(0, 7)
       m[k] = (m[k] || 0) + toCLP(r.valor, r.moeda)
     }
+    // 2) Comissões: alocadas no mês da data (independente de pago_em).
+    for (const c of comissoesPeriodo) {
+      const k = c.data.slice(0, 7)
+      m[k] = (m[k] || 0) + toCLP(c.valor, c.moeda)
+    }
+    // 3) Despesas fixas pendentes: pra cada mês do range, se a despesa está vigente
+    //    e ainda não tem recebimento amarrado, soma o valor previsto.
+    const paidSet = new Set(
+      balRaw
+        .filter((r) => r.despesa_fixa_id && r.mes_ref)
+        .map((r) => `${r.despesa_fixa_id}|${r.mes_ref}`),
+    )
+    for (const k of months) {
+      const mesStart = firstDayISO(k)
+      const mesEnd = lastDayISO(k)
+      const mesRef = `${k}-01`
+      for (const d of despesasFixas) {
+        if (d.vigente_desde > mesEnd) continue
+        if (d.vigente_ate && d.vigente_ate < mesStart) continue
+        if (paidSet.has(`${d.id}|${mesRef}`)) continue
+        m[k] = (m[k] || 0) + toCLP(d.valor, d.moeda)
+      }
+    }
     return m
-  }, [balRaw, toCLP])
+  }, [balRaw, comissoesPeriodo, despesasFixas, months, toCLP])
 
   const perPasseio = useMemo(() => {
     const acc = {}
