@@ -65,6 +65,7 @@ export default function DespesasFixas() {
   const [todasDespesas, setTodasDespesas] = useState([])
   const [pagamentos, setPagamentos] = useState([])
   const [pendError, setPendError] = useState('')
+  const [pagando, setPagando] = useState(() => new Set())
 
   // Carrega pessoas e fornecedores uma vez.
   useEffect(() => {
@@ -235,6 +236,12 @@ export default function DespesasFixas() {
     const descricaoPagamento = `${p.despesa.descricao} - ${monthLabel(p.mes_ref)}`
     const valorTxt = formatIn(p.despesa.valor, p.despesa.moeda)
     if (!confirm(`Marcar "${descricaoPagamento}" como paga?\n\nUma saída de ${valorTxt} será lançada hoje no caixa.`)) return
+    const key = `${p.despesa.id}|${p.mes_ref}`
+    setPagando((s) => {
+      const n = new Set(s)
+      n.add(key)
+      return n
+    })
     const { error } = await supabase.from('recebimentos').insert({
       data: todayISO(),
       valor: p.despesa.valor,
@@ -244,7 +251,14 @@ export default function DespesasFixas() {
       despesa_fixa_id: p.despesa.id,
       mes_ref: p.mes_ref,
     })
-    if (error) return setPendError(error.message)
+    if (error) {
+      setPagando((s) => {
+        const n = new Set(s)
+        n.delete(key)
+        return n
+      })
+      return setPendError(error.message)
+    }
     refresh()
   }
 
@@ -463,15 +477,23 @@ export default function DespesasFixas() {
                     )}
                   </p>
                 </div>
-                <button
-                  type="button"
-                  className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition"
-                  onClick={() => marcarComoPaga(p)}
-                  title="Marcar como paga"
-                  aria-label="Marcar como paga"
-                >
-                  <CheckCircle2 className="h-6 w-6" />
-                </button>
+                {pagando.has(`${p.despesa.id}|${p.mes_ref}`) ? (
+                  <span
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-emerald-600"
+                    aria-label="Pago"
+                  >
+                    <CheckCircle2 className="h-5 w-5" />
+                    Pago
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn-primary py-1.5 px-3 text-xs whitespace-nowrap"
+                    onClick={() => marcarComoPaga(p)}
+                  >
+                    Marcar como paga
+                  </button>
+                )}
               </li>
             ))}
           </ul>
